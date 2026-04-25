@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evolução Jurídica - Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 min-h-screen pb-10">
+
+    <nav class="bg-indigo-900 text-white p-4 shadow-lg mb-6">
+        <div class="max-w-4xl mx-auto flex justify-between items-center">
+            <h1 class="font-bold text-xl"><i class="fas fa-balance-scale mr-2"></i>Minha Evolução</h1>
+            <span class="text-xs opacity-75">Foco: Analista / TJ</span>
+        </div>
+    </nav>
+
+    <main class="max-w-4xl mx-auto px-4 space-y-6">
+        
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+            <h2 class="font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-edit text-indigo-600 mr-2"></i> Registrar Estudo
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <select id="materia" class="p-3 border rounded-xl bg-gray-50 focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <option value="Direito Constitucional">Direito Constitucional</option>
+                    <option value="Direito Administrativo">Direito Administrativo</option>
+                    <option value="Direito Civil">Direito Civil</option>
+                    <option value="Processo Civil">Processo Civil</option>
+                    <option value="Direito Penal">Direito Penal</option>
+                    <option value="Processo Penal">Processo Penal</option>
+                    <option value="Legislação Específica">Legislação Específica / RI</option>
+                    <option value="Direito do Trabalho">Direito do Trabalho</option>
+                    <option value="Processo do Trabalho">Processo do Trabalho</option>
+                </select>
+                <input type="text" id="tema" placeholder="Tema (ex: Recursos, Atos...)" class="p-3 border rounded-xl bg-gray-50 outline-none">
+                <input type="number" id="tempo" placeholder="Tempo (em minutos)" class="p-3 border rounded-xl bg-gray-50 outline-none">
+                <button onclick="salvarEstudo()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-all">
+                    Salvar Progresso
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm">
+                <h3 class="font-bold text-gray-700 mb-4">Distribuição de Matérias</h3>
+                <canvas id="chartMaterias"></canvas>
+            </div>
+            <div class="bg-white p-6 rounded-2xl shadow-sm">
+                <h3 class="font-bold text-gray-700 mb-4">Evolução Diária (min)</h3>
+                <canvas id="chartEvolucao"></canvas>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div class="p-6 border-b">
+                <h3 class="font-bold text-gray-800">Histórico de Atividades</h3>
+            </div>
+            <div id="listaHistorico" class="divide-y">
+                </div>
+        </div>
+
+        <button onclick="exportarDados()" class="w-full py-2 text-gray-500 text-sm hover:text-indigo-600">
+            <i class="fas fa-download mr-1"></i> Exportar backup para Excel (CSV)
+        </button>
+
+    </main>
+
+    <script>
+        let estudos = JSON.parse(localStorage.getItem('estudos_analista')) || [];
+        let chartM; let chartE;
+
+        function salvarEstudo() {
+            const materia = document.getElementById('materia').value;
+            const tema = document.getElementById('tema').value;
+            const tempo = parseInt(document.getElementById('tempo').value);
+            const data = new Date().toISOString().split('T')[0];
+
+            if (!tema || !tempo) return alert("Preencha o tema e o tempo!");
+
+            estudos.push({ materia, tema, tempo, data });
+            localStorage.setItem('estudos_analista', JSON.stringify(estudos));
+            
+            document.getElementById('tema').value = "";
+            document.getElementById('tempo').value = "";
+            atualizarInterface();
+        }
+
+        function atualizarInterface() {
+            renderHistorico();
+            renderGraficos();
+        }
+
+        function renderHistorico() {
+            const container = document.getElementById('listaHistorico');
+            container.innerHTML = estudos.slice().reverse().map(e => `
+                <div class="p-4 hover:bg-gray-50 flex justify-between items-center">
+                    <div>
+                        <p class="font-semibold text-gray-800">${e.materia}</p>
+                        <p class="text-sm text-gray-500">${e.tema} • ${e.data.split('-').reverse().join('/')}</p>
+                    </div>
+                    <span class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">${e.tempo} min</span>
+                </div>
+            `).join('') || '<p class="p-6 text-center text-gray-400">Nenhum registro ainda.</p>';
+        }
+
+        function renderGraficos() {
+            const dadosMateria = {};
+            const dadosData = {};
+
+            estudos.forEach(e => {
+                dadosMateria[e.materia] = (dadosMateria[e.materia] || 0) + e.tempo;
+                dadosData[e.data] = (dadosData[e.data] || 0) + e.tempo;
+            });
+
+            if(chartM) chartM.destroy();
+            if(chartE) chartE.destroy();
+
+            chartM = new Chart(document.getElementById('chartMaterias'), {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(dadosMateria),
+                    datasets: [{ data: Object.values(dadosMateria), backgroundColor: ['#4338ca', '#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe', '#312e81', '#4f46e5'] }]
+                }
+            });
+
+            chartE = new Chart(document.getElementById('chartEvolucao'), {
+                type: 'line',
+                data: {
+                    labels: Object.keys(dadosData),
+                    datasets: [{ label: 'Minutos', data: Object.values(dadosData), borderColor: '#4338ca', fill: true, backgroundColor: '#4338ca22' }]
+                }
+            });
+        }
+
+        function exportarDados() {
+            let csv = "Data,Materia,Tema,Tempo(min)\n";
+            estudos.forEach(e => { csv += `${e.data},${e.materia},${e.tema},${e.tempo}\n` });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', 'meus_estudos.csv');
+            a.click();
+        }
+
+        atualizarInterface();
+    </script>
+</body>
+</html>
